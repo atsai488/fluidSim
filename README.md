@@ -1,4 +1,4 @@
-Unity fluid simulation inspired by 
+**Unity fluid simulation** 
 
 Heavily inspired by [this video](https://youtu.be/rSKMYc1CQHE?si=KNw_i1sN2_CWEmzA) made by Sebastian Lague.
 Project created with Unity 2022.3
