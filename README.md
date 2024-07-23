@@ -8,4 +8,5 @@ Help from the following videos:
 
 Help from following papers:
 * https://matthias-research.github.io/pages/publications/sca03.pdf
+* https://cseweb.ucsd.edu/classes/sp19/cse291-d/Files/CSE291_09_ParticleBasedFluids.pdf
 
