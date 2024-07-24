@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Unity.VisualScripting;
 using UnityEngine;
 
 public class balls : MonoBehaviour
@@ -19,30 +18,39 @@ public class balls : MonoBehaviour
     public Material whiteMaterial; 
     private List<LineRenderer> circleRenderers; 
     private Vector2 halfBoundsSize;
+    private List<float> desnsities;
+    private List<Vector2> pressures;
+    public float idealGasConstant = 1;
+    public float restingDensity = 0.5f;
+   void Start()
+{
+    positions = new List<Vector2>(numBalls);
+    velocities = new List<Vector2>(numBalls);
+    accelerations = new List<Vector2>(numBalls);
+    circleRenderers = new List<LineRenderer>(numBalls);
+    desnsities = new List<float>(numBalls);
 
+    halfBoundsSize = Camera.main.ScreenToWorldPoint(new Vector2(Screen.width, Screen.height));
+    halfBoundsSize -= Vector2.one * ballRadius;
 
-    void Start()
+    for (int i = 0; i < numBalls; i++)
     {
-        // Initialize lists
-        positions = new List<Vector2>(numBalls);
-        velocities = new List<Vector2>(numBalls);
-        accelerations = new List<Vector2>(numBalls);
-        circleRenderers = new List<LineRenderer>(numBalls);
-        for (int i = 0; i < numBalls; i++)
-        {
-            int xDisplacement = i % 10;
-            int yDisplacement = i / 10;
-            Vector2 spawnPos = new Vector2(xDisplacement * 2, yDisplacement * 2);
-            positions.Add(spawnPos);
-            velocities.Add(Vector2.zero);
-            accelerations.Add(new Vector2(0, -9.81f));
-            LineRenderer circleRenderer = Instantiate(circleRendererPrefab, transform);
-            circleRenderer.material = whiteMaterial;
-            circleRenderers.Add(circleRenderer);
-        }
-        halfBoundsSize = Camera.main.ScreenToWorldPoint(new Vector2(Screen.width, Screen.height));
-        halfBoundsSize -= Vector2.one * ballRadius;
+        // Generate random positions within the screen boundaries
+        float randomX = UnityEngine.Random.Range(-halfBoundsSize.x, halfBoundsSize.x);
+        float randomY = UnityEngine.Random.Range(-halfBoundsSize.y, halfBoundsSize.y);
+        Vector2 spawnPos = new Vector2(randomX, randomY);
+
+        positions.Add(spawnPos);
+        velocities.Add(Vector2.zero);
+        accelerations.Add(new Vector2(0, 0));
+        desnsities.Add(0f);
+        
+        LineRenderer circleRenderer = Instantiate(circleRendererPrefab, transform);
+        circleRenderer.material = whiteMaterial;
+        circleRenderers.Add(circleRenderer);
     }
+}
+
 
     void Update()
     {
@@ -52,12 +60,29 @@ public class balls : MonoBehaviour
             moveBall(i, deltaTime);
             boundaryCollision(i);
         });
+        calculateDensity();
+        calculateAcceleration();
         for (int i = 0; i < numBalls; i++)
         {
             DrawCircle(circleRenderers[i], ballRadius, positions[i].x, positions[i].y);
         }
     }
+    void calculateAcceleration(){
+        for (int i = 0; i<numBalls; i++){
+            accelerations[i] += calculatePressure(i);
+            // accelerations[i] += externalForceCalculaiton(positions[i]);
+        }
+        // viscocityForceCalculation();
+    }
+    void pressureForceCalculation(){
 
+    }
+    void viscocityForceCalculation(){
+
+    }
+    void externalForceCalculaiton(Vector2 Point){
+        // return new Vector2(0, -9.8f);
+    }
     void DrawCircle(LineRenderer circleRenderer, float ballRadius, float xPos, float yPos)
     {
         circleRenderer.positionCount = steps + 1;
@@ -76,24 +101,27 @@ public class balls : MonoBehaviour
         }
     }
 
-    void ballCollision()
-    {
-        
+    Vector2 calculatePressure(int particle){
+        Vector2 point = positions[particle];
+        Vector2 propertyGradient = Vector2.zero;
+        Vector2 basis = new Vector2(1, 0);
+        int mass = 1;
+        for (int i = 0; i < numBalls; i++)
+        {
+            float dist = (positions[i] - point).magnitude;
+            float angle = Vector2.Angle(positions[i]-point, basis);
+            float slope = smoothingKernalDerivative(kernelRadius, dist);
+            float density = desnsities[i];
+            Vector2 contribution = new Vector2(slope*Mathf.Cos(angle), slope*Mathf.Sin(angle));
+            propertyGradient +=  idealGasConstant*(desnsities[i]-restingDensity)/desnsities[i]*contribution * mass;
+        }
+        return propertyGradient;
     }
-    // Vector2 calculateGradient(Vector2 point){
-    //     Vector2 propertyGradient = Vector2.zero;
-    //     for (int i = 0; i < numBalls; i++)
-    //     {
-    //         float dist = (positions[i] - point).magnitude;
-    //         float slope = smoothingKernalDerivative(kernelRadius, dist);
-    //         propertyGradient+= 
-    //     }
-    // }
     static float smoothingKernel(float radius, float dist)
     {
         //volume is included to allow for dynamic smoothing radius
         float volume = Mathf.PI*Mathf.Pow(radius,5)/10;
-        float val = Mathf.Max(0, radius - dist);
+        float val = Mathf.Max(0, radius - Mathf.Abs(dist));
         return val * val * val / volume;
     }
     static float smoothingKernalDerivative(float dist, float radius)
@@ -103,15 +131,19 @@ public class balls : MonoBehaviour
         float scale = -30 / Mathf.PI / Mathf.Pow(radius, 5);
         return scale * f * f;
     }
-    float calculateDensity(Vector2 pos)
+
+    void calculateDensity()
     {
-        int mass = 1;
-        float density = 0f;
-        foreach (Vector2 position in positions){
-            float dist = (pos - position).magnitude;
-            density += mass * smoothingKernel(kernelRadius, dist);
+        for (int i = 0; i < numBalls; i++)
+        {
+            int mass = 1;
+            float density = 0f;
+            foreach (Vector2 position in positions){
+                float dist = (positions[i] - position).magnitude;
+                density += mass * smoothingKernel(kernelRadius, dist);
+            }
+            desnsities[i] = density;
         }
-        return density;
     }
 
     void moveBall(int i, float deltaTime)
@@ -127,6 +159,7 @@ public class balls : MonoBehaviour
         {
             positions[i] = new Vector2(Mathf.Sign(positions[i].x) * halfBoundsSize.x, positions[i].y);
             velocities[i] = new Vector2(velocities[i].x * -1 * dampingFactor, velocities[i].y);
+            accelerations[i] = Vector2.zero;
         }
 
         // Check vertical boundaries
@@ -134,6 +167,8 @@ public class balls : MonoBehaviour
         {
             positions[i] = new Vector2(positions[i].x, Mathf.Sign(positions[i].y) * halfBoundsSize.y);
             velocities[i] = new Vector2(velocities[i].x, velocities[i].y * -1 * dampingFactor);
+            accelerations[i] = Vector2.zero;
+
         }
     }
 }

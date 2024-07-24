@@ -183,7 +183,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 30
+  orthographic size: 100
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -363,9 +363,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c597ff6357763be47ad9350f567eca75, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ballRadius: 0.1
-  numBalls: 34
-  acceleration: []
+  ballRadius: 0.5
+  numBalls: 325
+  kernelRadius: 0
+  accelerations: []
   dampingFactor: 0.8
   circleRendererPrefab: {fileID: 3693081213258988926, guid: 0ebf25cfb654b2f40bb490c3444be038, type: 3}
   whiteMaterial: {fileID: 2100000, guid: 1a81836ecc2aad04eb1bd2e0af72789c, type: 2}
