@@ -1,7 +1,9 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class balls : MonoBehaviour
@@ -21,27 +23,25 @@ public class balls : MonoBehaviour
   public float pressureMultiplier = 1;
   public float restingDensity = 0.5f;
   public float restitution = 0.3f;
-
+  public float gravity = -9.8f;
+  public int[] spatialLookUp;
+  public int[] startingIndex;
   void Start()
   {
     positions = new List<Vector2>(numBalls);
     velocities = new List<Vector2>(numBalls);
     circleRenderers = new List<LineRenderer>(numBalls);
     densities = new List<float>(numBalls);
-
     halfBoundsSize = Camera.main.ScreenToWorldPoint(new Vector2(Screen.width, Screen.height));
     halfBoundsSize -= Vector2.one * ballRadius;
-
     for (int i = 0; i < numBalls; i++)
     {
       float randomX = UnityEngine.Random.Range(-halfBoundsSize.x, halfBoundsSize.x);
       float randomY = UnityEngine.Random.Range(-halfBoundsSize.y, halfBoundsSize.y);
       Vector2 spawnPos = new Vector2(randomX, randomY);
-
       positions.Add(spawnPos);
       velocities.Add(Vector2.zero);
       densities.Add(0f);
-
       LineRenderer circleRenderer = Instantiate(circleRendererPrefab, transform);
       circleRenderer.material = whiteMaterial;
       circleRenderers.Add(circleRenderer);
@@ -54,7 +54,7 @@ public class balls : MonoBehaviour
     Parallel.For(0, numBalls, i =>
     {
       moveBall(i, deltaTime);
-      checkCollision();
+      // checkCollision();
       boundaryCollision(i);
     });
     // Check for collisions and resolve them
@@ -67,6 +67,30 @@ public class balls : MonoBehaviour
       calculateAcceleration(i, deltaTime);
       DrawCircle(circleRenderers[i], ballRadius, positions[i].x, positions[i].y);
     }
+  }
+  void updatePostionHashes(Vector2[] positions, float radius)
+  {
+    Parallel.For(0, numBalls, i =>
+    {
+      (int cellX, int cellY) = getCell(positions[i], radius);
+      uint hash = hashCell(cellX, cellY);
+      uint key = getHashKey(hash);
+      //TODO: implement hashtable for neighbor search
+    });
+  }
+  (int, int) getCell(Vector2 pos, float radius)
+  {
+    int x = (int)(pos.x / radius);
+    int y = (int)(pos.y / radius);
+    return (x, y);
+  }
+  uint getHashKey(uint Hash)
+  {
+    return Hash % (uint)spatialLookUp.Length;
+  }
+  uint hashCell(int x, int y)
+  {
+    return (uint)x * 83492791 + (uint)y * 73856093;
   }
   void checkCollision()
   {
@@ -122,7 +146,7 @@ public class balls : MonoBehaviour
 
   Vector2 externalForceCalculation(Vector2 Point)
   {
-    return new Vector2(0, -5f);
+    return new Vector2(0, gravity);
   }
 
   void DrawCircle(LineRenderer circleRenderer, float ballRadius, float xPos, float yPos)
