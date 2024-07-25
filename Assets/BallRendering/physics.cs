@@ -10,22 +10,19 @@ public class balls: MonoBehaviour {
   public int numBalls;
   public float kernelRadius;
   private List < Vector2 > positions;
-  private List < Vector2 > velocities;
-  public List < Vector2 > accelerations;
+  public List < Vector2 > velocities;
   public float dampingFactor = 0.8f;
   public LineRenderer circleRendererPrefab;
   public Material whiteMaterial;
   private List < LineRenderer > circleRenderers;
   private Vector2 halfBoundsSize;
   private List < float > densities;
-  private List < Vector2 > pressures;
-  public float idealGasConstant = 1;
+  public float pressureMultiplier = 1;
   public float restingDensity = 0.5f;
 
   void Start() {
     positions = new List < Vector2 > (numBalls);
     velocities = new List < Vector2 > (numBalls);
-    accelerations = new List < Vector2 > (numBalls);
     circleRenderers = new List < LineRenderer > (numBalls);
     densities = new List < float > (numBalls);
 
@@ -39,7 +36,6 @@ public class balls: MonoBehaviour {
 
     positions.Add(spawnPos);
     velocities.Add(Vector2.zero);
-    accelerations.Add(new Vector2(0, 0));
     densities.Add(0f);
 
     LineRenderer circleRenderer = Instantiate(circleRendererPrefab, transform);
@@ -52,17 +48,16 @@ public class balls: MonoBehaviour {
     float deltaTime = Time.deltaTime;
     Parallel.For(0, numBalls, i => {
       moveBall(i, deltaTime);
+      checkCollision();
       boundaryCollision(i);
     });
-
     // Check for collisions and resolve them
-    checkCollision();
-
-    calculateDensity();
-    calculateAcceleration();
-
+    Parallel.For(0, numBalls, i => {
+        calculateDensity(i); 
+    });
     for (int i = 0; i < numBalls; i++) {
-      DrawCircle(circleRenderers[i], ballRadius, positions[i].x, positions[i].y);
+        calculateAcceleration(i, deltaTime);
+        DrawCircle(circleRenderers[i], ballRadius, positions[i].x, positions[i].y);
     }
   }
   void checkCollision() {
@@ -94,11 +89,10 @@ public class balls: MonoBehaviour {
     }
   }
 
-  void calculateAcceleration() {
-    for (int i = 0; i < numBalls; i++) {
-      accelerations[i] += calculatePressure(i);
-      accelerations[i] += externalForceCalculation(positions[i]);
-    }
+  void calculateAcceleration(int i, float deltaTime) {
+   
+    velocities[i] += calculatePressure(i)/densities[i]*deltaTime;
+    //velocities[i] += externalForceCalculation(positions[i])*deltaTime;
     // viscosityForceCalculation();
   }
 
@@ -111,7 +105,7 @@ public class balls: MonoBehaviour {
   }
 
   Vector2 externalForceCalculation(Vector2 Point) {
-    return new Vector2(0, 0);
+    return new Vector2(0, -9.8f);
   }
 
   void DrawCircle(LineRenderer circleRenderer, float ballRadius, float xPos, float yPos) {
@@ -131,21 +125,35 @@ public class balls: MonoBehaviour {
   }
 
   Vector2 calculatePressure(int particle) {
-    Vector2 point = positions[particle];
-    Vector2 propertyGradient = Vector2.zero;
-    Vector2 basis = new Vector2(1, 0);
+    Vector2 pressureForce = Vector2.zero;
     int mass = 1;
     for (int i = 0; i < numBalls; i++) {
-      float dist = (positions[i] - point).magnitude;
-      float angle = Vector2.Angle(positions[i] - point, basis);
+        if (i==particle) continue;
+        Vector2 offset = positions[i] - positions[particle];
+      float dist = offset.magnitude;
+      Vector2 dir = dist == 0 ? getRandomDir() : offset / dist;
       float slope = smoothingKernelDerivative(kernelRadius, dist);
-      float density = densities[i];
-      Vector2 contribution = new Vector2(slope * Mathf.Cos(angle), slope * Mathf.Sin(angle));
-      propertyGradient += idealGasConstant * (densities[i] - restingDensity) / densities[i] * contribution * mass;
+      float sharedPressureForce = sharedPressure(densities[i], densities[particle]);
+      pressureForce -= sharedPressureForce * dir *slope *mass /densities[i];
     }
-    return propertyGradient;
+    return pressureForce;
   }
+Vector2 getRandomDir() {
+    float angle = UnityEngine.Random.Range(0f, Mathf.PI * 2);
+    Vector2 randomDir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+    return randomDir;
+}
 
+float sharedPressure(float densityA, float desnityB){
+  float pressureA = ConvertDensiyToPressure(densityA);
+  float pressureB = ConvertDensiyToPressure(desnityB);
+  return (pressureA + pressureB)/2;
+}
+float ConvertDensiyToPressure(float density){
+    float densityError = density - restingDensity;
+    float pressure = densityError * pressureMultiplier;
+    return pressure;
+}
   static float smoothingKernel(float radius, float dist) {
     float volume = Mathf.PI * Mathf.Pow(radius, 5) / 10;
     float val = Mathf.Max(0, radius - Mathf.Abs(dist));
@@ -159,21 +167,18 @@ public class balls: MonoBehaviour {
     return scale * f * f;
   }
 
-  void calculateDensity() {
-    for (int i = 0; i < numBalls; i++) {
-      int mass = 1;
-      float density = 0f;
-      foreach(Vector2 position in positions) {
+  void calculateDensity(int i) {
+    int mass = 1;
+    float density = 0f;
+    foreach(Vector2 position in positions) {
         float dist = (positions[i] - position).magnitude;
         density += mass * smoothingKernel(kernelRadius, dist);
-      }
-      densities[i] = density;
     }
+    densities[i] = density;
   }
 
   void moveBall(int i, float deltaTime) {
     positions[i] += velocities[i] * deltaTime;
-    velocities[i] += accelerations[i] * deltaTime;
   }
 
   void boundaryCollision(int i) {
@@ -181,14 +186,14 @@ public class balls: MonoBehaviour {
     if (Mathf.Abs(positions[i].x) > halfBoundsSize.x) {
       positions[i] = new Vector2(Mathf.Sign(positions[i].x) * halfBoundsSize.x, positions[i].y);
       velocities[i] = new Vector2(velocities[i].x * -1 * dampingFactor, velocities[i].y);
-      accelerations[i] = Vector2.zero;
+
     }
 
     // Check vertical boundaries
     if (Mathf.Abs(positions[i].y) > halfBoundsSize.y) {
       positions[i] = new Vector2(positions[i].x, Mathf.Sign(positions[i].y) * halfBoundsSize.y);
       velocities[i] = new Vector2(velocities[i].x, velocities[i].y * -1 * dampingFactor);
-      accelerations[i] = Vector2.zero;
+
     }
   }
 }
