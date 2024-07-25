@@ -183,7 +183,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 100
+  orthographic size: 10
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -345,7 +345,7 @@ Transform:
   m_GameObject: {fileID: 547026175}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.167427, y: -8.552491, z: -0.7471351}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -363,13 +363,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c597ff6357763be47ad9350f567eca75, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ballRadius: 0.5
-  numBalls: 325
-  kernelRadius: 0
-  accelerations: []
-  dampingFactor: 0.8
+  ballRadius: 0.1
+  numBalls: 100
+  kernelRadius: 1.5
+  velocities: []
+  dampingFactor: 0.3
   circleRendererPrefab: {fileID: 3693081213258988926, guid: 0ebf25cfb654b2f40bb490c3444be038, type: 3}
   whiteMaterial: {fileID: 2100000, guid: 1a81836ecc2aad04eb1bd2e0af72789c, type: 2}
+  pressureMultiplier: 5
+  restingDensity: 10
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

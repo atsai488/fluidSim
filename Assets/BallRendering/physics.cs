@@ -92,7 +92,7 @@ public class balls: MonoBehaviour {
   void calculateAcceleration(int i, float deltaTime) {
    
     velocities[i] += calculatePressure(i)/densities[i]*deltaTime;
-    //velocities[i] += externalForceCalculation(positions[i])*deltaTime;
+    velocities[i] += externalForceCalculation(positions[i])/densities[i]*deltaTime;
     // viscosityForceCalculation();
   }
 
@@ -105,7 +105,7 @@ public class balls: MonoBehaviour {
   }
 
   Vector2 externalForceCalculation(Vector2 Point) {
-    return new Vector2(0, -9.8f);
+    return new Vector2(0, -5f);
   }
 
   void DrawCircle(LineRenderer circleRenderer, float ballRadius, float xPos, float yPos) {
