@@ -1,11 +1,9 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Unity.VisualScripting;
 using UnityEngine;
-
 public class balls : MonoBehaviour
 {
   public float ballRadius = 0.1f;
@@ -24,7 +22,7 @@ public class balls : MonoBehaviour
   public float restingDensity = 0.5f;
   public float restitution = 0.3f;
   public float gravity = -9.8f;
-  public int[] spatialLookUp;
+  public Entry[] spatialLookUp;
   public int[] startingIndex;
   void Start()
   {
@@ -32,6 +30,8 @@ public class balls : MonoBehaviour
     velocities = new List<Vector2>(numBalls);
     circleRenderers = new List<LineRenderer>(numBalls);
     densities = new List<float>(numBalls);
+    spatialLookUp = new Entry[numBalls];
+    startingIndex = new int[numBalls];
     halfBoundsSize = Camera.main.ScreenToWorldPoint(new Vector2(Screen.width, Screen.height));
     halfBoundsSize -= Vector2.one * ballRadius;
     for (int i = 0; i < numBalls; i++)
@@ -42,6 +42,7 @@ public class balls : MonoBehaviour
       positions.Add(spawnPos);
       velocities.Add(Vector2.zero);
       densities.Add(0f);
+
       LineRenderer circleRenderer = Instantiate(circleRendererPrefab, transform);
       circleRenderer.material = whiteMaterial;
       circleRenderers.Add(circleRenderer);
@@ -61,6 +62,7 @@ public class balls : MonoBehaviour
     Parallel.For(0, numBalls, i =>
     {
       calculateDensity(i);
+      updatePostionHashes(positions, kernelRadius);
     });
     for (int i = 0; i < numBalls; i++)
     {
@@ -68,16 +70,28 @@ public class balls : MonoBehaviour
       DrawCircle(circleRenderers[i], ballRadius, positions[i].x, positions[i].y);
     }
   }
-  void updatePostionHashes(Vector2[] positions, float radius)
+  void updatePostionHashes(List<Vector2> positions, float radius)
   {
     Parallel.For(0, numBalls, i =>
     {
       (int cellX, int cellY) = getCell(positions[i], radius);
       uint hash = hashCell(cellX, cellY);
       uint key = getHashKey(hash);
-      //TODO: implement hashtable for neighbor search
+      spatialLookUp[i] = new Entry(key, i);
+      startingIndex[i] = int.MaxValue;
+    });
+    Array.Sort(spatialLookUp);
+    Parallel.For(0, spatialLookUp.Length, i =>
+    {
+      uint cellNum = spatialLookUp[i].cellNum;
+      uint prevCellNum = i == 0 ? uint.MaxValue : spatialLookUp[i - 1].cellNum;
+      if (cellNum != prevCellNum)
+      {
+        startingIndex[cellNum] = i;
+      }
     });
   }
+
   (int, int) getCell(Vector2 pos, float radius)
   {
     int x = (int)(pos.x / radius);
@@ -86,7 +100,7 @@ public class balls : MonoBehaviour
   }
   uint getHashKey(uint Hash)
   {
-    return Hash % (uint)spatialLookUp.Length;
+    return Hash % (uint)numBalls;
   }
   uint hashCell(int x, int y)
   {
@@ -134,10 +148,6 @@ public class balls : MonoBehaviour
     // viscosityForceCalculation();
   }
 
-  void pressureForceCalculation()
-  {
-    // Placeholder method
-  }
 
   void viscosityForceCalculation()
   {
@@ -252,5 +262,21 @@ public class balls : MonoBehaviour
       velocities[i] = new Vector2(velocities[i].x, velocities[i].y * -1 * dampingFactor);
 
     }
+  }
+}
+public class Entry : IComparable<Entry>
+{
+  public uint cellNum;
+  public int particleNum;
+
+  public Entry(uint cellNum, int particleNum)
+  {
+    this.cellNum = cellNum;
+    this.particleNum = particleNum;
+  }
+
+  public int CompareTo(Entry other)
+  {
+    return this.cellNum - other.cellNum == 0 ? this.particleNum - other.particleNum : (int)(this.cellNum - other.cellNum);
   }
 }

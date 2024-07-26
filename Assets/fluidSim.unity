@@ -364,14 +364,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ballRadius: 0.1
-  numBalls: 100
-  kernelRadius: 1.5
+  numBalls: 400
+  kernelRadius: 3
   velocities: []
   dampingFactor: 0.3
   circleRendererPrefab: {fileID: 3693081213258988926, guid: 0ebf25cfb654b2f40bb490c3444be038, type: 3}
   whiteMaterial: {fileID: 2100000, guid: 1a81836ecc2aad04eb1bd2e0af72789c, type: 2}
-  pressureMultiplier: 5
-  restingDensity: 10
+  pressureMultiplier: 4
+  restingDensity: 15
+  restitution: 0.3
+  gravity: 0
+  spatialLookUp: 
+  startingIndex: 
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
