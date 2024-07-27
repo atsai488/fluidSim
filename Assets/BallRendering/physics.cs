@@ -17,13 +17,14 @@ public class balls : MonoBehaviour
   public Material whiteMaterial;
   private List<LineRenderer> circleRenderers;
   private Vector2 halfBoundsSize;
-  private List<float> densities;
+  public List<float> densities;
   public float pressureMultiplier = 1;
   public float restingDensity = 0.5f;
   public float restitution = 0.3f;
   public float gravity = -9.8f;
   public Entry[] spatialLookUp;
   public int[] startingIndex;
+  private (int, int)[] offsets;
   void Start()
   {
     positions = new List<Vector2>(numBalls);
@@ -34,6 +35,16 @@ public class balls : MonoBehaviour
     startingIndex = new int[numBalls];
     halfBoundsSize = Camera.main.ScreenToWorldPoint(new Vector2(Screen.width, Screen.height));
     halfBoundsSize -= Vector2.one * ballRadius;
+    offsets = new (int, int)[9];
+    offsets[0] = (0, 0);
+    offsets[1] = (1, 0);
+    offsets[2] = (-1, 0);
+    offsets[3] = (0, 1);
+    offsets[4] = (0, -1);
+    offsets[5] = (1, 1);
+    offsets[6] = (1, -1);
+    offsets[7] = (-1, 1);
+    offsets[8] = (-1, -1);
     for (int i = 0; i < numBalls; i++)
     {
       float randomX = UnityEngine.Random.Range(-halfBoundsSize.x, halfBoundsSize.x);
@@ -61,13 +72,14 @@ public class balls : MonoBehaviour
     // Check for collisions and resolve them
     Parallel.For(0, numBalls, i =>
     {
-      calculateDensity(i);
       updatePostionHashes(positions, kernelRadius);
+      calculateDensity(i);
     });
     for (int i = 0; i < numBalls; i++)
     {
       calculateAcceleration(i, deltaTime);
       DrawCircle(circleRenderers[i], ballRadius, positions[i].x, positions[i].y);
+      
     }
   }
   void updatePostionHashes(List<Vector2> positions, float radius)
@@ -143,9 +155,37 @@ public class balls : MonoBehaviour
   void calculateAcceleration(int i, float deltaTime)
   {
 
-    velocities[i] += calculatePressure(i) / densities[i] * deltaTime;
+    velocities[i] = calculatePressure(i) / densities[i] * deltaTime;
     velocities[i] += externalForceCalculation(positions[i]) * deltaTime;
     // viscosityForceCalculation();
+  }
+
+  void calculateDensity(int particleNum)
+  {
+    (int cellX, int cellY) = getCell(positions[particleNum], kernelRadius);
+    float sqrRadius = kernelRadius * kernelRadius;
+    int mass = 1;
+    float density = 0f;
+    foreach ((int offsetX, int offsetY) in offsets)
+    {
+      int offsetCellX = cellX + offsetX;
+      int offsetCellY = cellY + offsetY;
+      uint hashkey = getHashKey(hashCell(offsetCellX, offsetCellY));
+      int startIndex = startingIndex[hashkey];
+      for (int i = startIndex; i < spatialLookUp.Length; i++)
+      {
+        if (spatialLookUp[i].cellNum != hashkey) break;
+        int particleIndex = spatialLookUp[i].particleNum;
+        float sqrDst = (positions[particleIndex] - positions[particleNum]).sqrMagnitude;
+        if (sqrDst < sqrRadius)
+        {
+          float dist = (positions[particleNum] - positions[particleIndex]).magnitude;
+          density += mass * smoothingKernel(kernelRadius, dist);
+        }
+      }
+    }
+    // density += smoothingKernel(kernelRadius, 0);
+    densities[particleNum] = density;
   }
 
 
@@ -228,17 +268,17 @@ public class balls : MonoBehaviour
 
 
 
-  void calculateDensity(int i)
-  {
-    int mass = 1;
-    float density = 0f;
-    foreach (Vector2 position in positions)
-    {
-      float dist = (positions[i] - position).magnitude;
-      density += mass * smoothingKernel(kernelRadius, dist);
-    }
-    densities[i] = density;
-  }
+  // void calculateDensity(int i)
+  // {
+  //   int mass = 1;
+  //   float density = 0f;
+  //   foreach (Vector2 position in positions)
+  //   {
+  //     float dist = (positions[i] - position).magnitude;
+  //     density += mass * smoothingKernel(kernelRadius, dist);
+  //   }
+  //   densities[i] = density;
+  // }
 
   void moveBall(int i, float deltaTime)
   {
@@ -276,7 +316,30 @@ public class Entry : IComparable<Entry>
   }
 
   public int CompareTo(Entry other)
-  {
-    return this.cellNum - other.cellNum == 0 ? this.particleNum - other.particleNum : (int)(this.cellNum - other.cellNum);
-  }
+    {
+        if (this.cellNum != other.cellNum)
+        {
+            return this.cellNum.CompareTo(other.cellNum);
+        }
+        else
+        {
+            return this.particleNum.CompareTo(other.particleNum);
+        }
+    }
 }
+
+//  void checkparticlesAround(int particleNum)
+//   {
+//     (int cellX, int cellY) = getCell(positions[particleNum], kernelRadius);
+//     foreach ((int offsetX, int offsetY)  in offsets){
+//       int offsetCellX = cellX + offsetX;
+//       int offsetCellY = cellY + offsetY;
+//       uint hashkey = getHashKey(hashCell(offsetCellX, offsetCellY));
+//       int startIndex = startingIndex[hashkey];
+//       while (spatialLookUp[startIndex].cellNum == hashkey){
+//         int particleToCheck = spatialLookUp[startIndex].particleNum;
+
+//         startIndex++;
+//       }
+//     }
+//   }
