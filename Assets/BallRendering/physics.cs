@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Unity.VisualScripting;
 using UnityEngine;
 public class balls : MonoBehaviour
 {
@@ -22,9 +21,10 @@ public class balls : MonoBehaviour
   public float restingDensity = 0.5f;
   public float restitution = 0.3f;
   public float gravity = -9.8f;
-  public Entry[] spatialLookUp;
-  public int[] startingIndex;
+  private Entry[] spatialLookUp;
+  private int[] startingIndex;
   private (int, int)[] offsets;
+  public List<Vector2> debug;
   void Start()
   {
     positions = new List<Vector2>(numBalls);
@@ -33,6 +33,7 @@ public class balls : MonoBehaviour
     densities = new List<float>(numBalls);
     spatialLookUp = new Entry[numBalls];
     startingIndex = new int[numBalls];
+    debug = new List<Vector2>(numBalls);
     halfBoundsSize = Camera.main.ScreenToWorldPoint(new Vector2(Screen.width, Screen.height));
     halfBoundsSize -= Vector2.one * ballRadius;
     offsets = new (int, int)[9];
@@ -53,7 +54,7 @@ public class balls : MonoBehaviour
       positions.Add(spawnPos);
       velocities.Add(Vector2.zero);
       densities.Add(0f);
-
+      debug.Add(Vector2.zero);
       LineRenderer circleRenderer = Instantiate(circleRendererPrefab, transform);
       circleRenderer.material = whiteMaterial;
       circleRenderers.Add(circleRenderer);
@@ -79,7 +80,7 @@ public class balls : MonoBehaviour
     {
       calculateAcceleration(i, deltaTime);
       DrawCircle(circleRenderers[i], ballRadius, positions[i].x, positions[i].y);
-      
+
     }
   }
   void updatePostionHashes(List<Vector2> positions, float radius)
@@ -95,8 +96,8 @@ public class balls : MonoBehaviour
     Array.Sort(spatialLookUp);
     Parallel.For(0, spatialLookUp.Length, i =>
     {
-      uint cellNum = spatialLookUp[i].cellNum;
-      uint prevCellNum = i == 0 ? uint.MaxValue : spatialLookUp[i - 1].cellNum;
+      uint cellNum = spatialLookUp[i].cellHash;
+      uint prevCellNum = i == 0 ? uint.MaxValue : spatialLookUp[i - 1].cellHash;
       if (cellNum != prevCellNum)
       {
         startingIndex[cellNum] = i;
@@ -116,6 +117,22 @@ public class balls : MonoBehaviour
   }
   uint hashCell(int x, int y)
   {
+    if (x < 0)
+    {
+      x *= -2;
+    }
+    else
+    {
+      x *= 2 + 1;
+    }
+    if (y < 0)
+    {
+      x *= -2;
+    }
+    else
+    {
+      y *= 2 + 1;
+    }
     return (uint)x * 83492791 + (uint)y * 73856093;
   }
   void checkCollision()
@@ -163,6 +180,7 @@ public class balls : MonoBehaviour
   void calculateDensity(int particleNum)
   {
     (int cellX, int cellY) = getCell(positions[particleNum], kernelRadius);
+    debug[particleNum] = new Vector2(cellX, cellY);
     float sqrRadius = kernelRadius * kernelRadius;
     int mass = 1;
     float density = 0f;
@@ -174,7 +192,7 @@ public class balls : MonoBehaviour
       int startIndex = startingIndex[hashkey];
       for (int i = startIndex; i < spatialLookUp.Length; i++)
       {
-        if (spatialLookUp[i].cellNum != hashkey) break;
+        if (spatialLookUp[i].cellHash != hashkey) break;
         int particleIndex = spatialLookUp[i].particleNum;
         float sqrDst = (positions[particleIndex] - positions[particleNum]).sqrMagnitude;
         if (sqrDst < sqrRadius)
@@ -185,6 +203,7 @@ public class balls : MonoBehaviour
       }
     }
     // density += smoothingKernel(kernelRadius, 0);
+    density = 1;
     densities[particleNum] = density;
   }
 
@@ -270,6 +289,8 @@ public class balls : MonoBehaviour
 
   // void calculateDensity(int i)
   // {
+  //   (int cellX, int cellY) = getCell(positions[i], kernelRadius);
+  //   debug[i] = new Vector2(cellX, cellY);
   //   int mass = 1;
   //   float density = 0f;
   //   foreach (Vector2 position in positions)
@@ -306,26 +327,26 @@ public class balls : MonoBehaviour
 }
 public class Entry : IComparable<Entry>
 {
-  public uint cellNum;
+  public uint cellHash;
   public int particleNum;
 
   public Entry(uint cellNum, int particleNum)
   {
-    this.cellNum = cellNum;
+    this.cellHash = cellNum;
     this.particleNum = particleNum;
   }
 
   public int CompareTo(Entry other)
+  {
+    if (this.cellHash != other.cellHash)
     {
-        if (this.cellNum != other.cellNum)
-        {
-            return this.cellNum.CompareTo(other.cellNum);
-        }
-        else
-        {
-            return this.particleNum.CompareTo(other.particleNum);
-        }
+      return this.cellHash.CompareTo(other.cellHash);
     }
+    else
+    {
+      return this.particleNum.CompareTo(other.particleNum);
+    }
+  }
 }
 
 //  void checkparticlesAround(int particleNum)
